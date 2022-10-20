@@ -45,3 +45,26 @@ ageClass
 
 ```
 
+# Determine percent of males and females by class
+```{r}
+
+titanic$Sex <- if_else(titanic$Sex == "male", 1, 0)
+titanic$Sex <- factor(titanic$Sex,
+                      levels = c(0,1),
+                      labels = c("Female", "Male"))
+# convert sex from a character to a factor variable
+
+sexByClassCount <- table(titanic$Pclass, titanic$Sex)
+sexByClassCount
+# get a table of counts of males and females in each class
+
+sexByClassPercent <- (prop.table(sexByClassCount, 1))*100  
+sexByClassPercent
+# get a table with the percent of males and percent of females in each class
+
+sexbyClassTable <- cbind(sexByClassCount, sexByClassPercent)
+sexbyClassTable
+# merge the two tables to get a full table with counts and percentages
+
+```
+
