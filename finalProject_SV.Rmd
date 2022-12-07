@@ -1,0 +1,452 @@
+---
+title: "Final Project - Advanced Data Analysis"
+author: "Sydney Vie"
+date: "2022-12-6"
+output: html_document
+---
+# PROLOG   ################################################################'
+
+# PROJECT: The relationship between continued breastfeeding and
+#          stunting among children in Madagascar
+# PURPOSE: The purpose of this data file is to answer two objectives -
+#         1.) Is continued breastfeeding associated with stunting in children 
+#              aged 12-24 months in Madagascar?   
+#         2.) Does consumption of any animal source foods modify the association 
+#             between breastfeeding and stunting in children aged 12-24 
+#             months in Madagascar?
+# DIR: "C:/Users/sydne/OneDrive/Documents/MPH Stuff/2022 -
+#       Fall/Advanced Data Analysis/MDKR81SV/MDKR81FL.sav"
+# DATA: The data is the Children's Recode of the Madagascar 2021 
+#       DHS. It is from the DHS program. The data is not public access, 
+#       but instructions for requesting the data can be found at the 
+#       following link: https://www.dhsprogram.com/data/Access-Instructions.cfm                                                              
+# AUTHOR:  Sydney Vie
+# CREATED: 11/04/2022
+# LATEST:  12/06/2022
+# PROLOG   ###############################################################
+
+# Load packages and data
+```{r, warning=FALSE}
+
+# load packages
+pacman::p_load(tidyverse, foreign, table1, DiagrammeR, odds.n.ends, blorr, lmtest, car, broom, jtools, writexl)
+# tidyverse: data cleaning, management, and visualization
+# foreign: reading SPSS data
+# table1: make a tidy table 1
+# DiagrammeR: make a tidy figure 1
+# odds.n.ends: logistic regression output - OR, confidence intervals
+# blorr: model fits of logistic regression
+# lmtest: likelihood ratio tests
+# car: compare coefficients
+# broom: model diagnostics
+# writexl: creating excel sheets from output
+
+# load data
+dhs_full <- read.spss("C:/Users/sydne/OneDrive/Documents/MPH Stuff/2022 - Fall/Advanced Data Analysis/MDKR81SV/MDKR81FL.sav", to.data.frame = TRUE)
+# full Madagascar 2021 data
+# 12499 observations and 1162 variables
+```
+
+# Data management
+The full Madagascar DHS 2021 dataset - Children's Recode, includes 1162 variables with 12499 observations. This data set is nationally representative and includes information on all children under the age of 5 years from surveyed households in Madagascar. This dataset also includes information on the households these children live in and information about the mother of each child. 
+
+The primary objective of the current research is to determine whether continued breastfeeding is associated with stunting in children aged 12-24 months in Madagascar. The secondary objective of the current research is to determine whether consumption of any animal source foods modifies the association between breastfeeding and stunting in children aged 12-24 months in Madagascar. 
+
+## Create an analytic dataset
+### Remove variables that will not be needed
+```{r}
+# create a smaller data set with potentially relevant variables
+dhs_small <- dhs_full %>% 
+  select(CASEID,MIDX,V001,V002,V003,V005,V012,V013,V014,V015,V020,V021,V022
+         ,V023,V024,V025,V034,V045C,V101,V102,V104,V105,V105A,V106,V107,V113,
+         V115,V116,V119,V127,V128,V129,V130,V133,V135,V136,V137,V138,V139,
+         V140,V149,V150,V151,V152,V155,V160,V171A,V171B,V190,V191,V190A,V191A
+         ,V201,V208,V209,V213,V214,V218,V219,V220,V224,V238,V404,V405,V406,
+         V409,V410,V411,V411A,V412A,V412C,V413,V414E,V414F,V414G,V414H,V414I
+         ,V414J,V414K,V414L,V414M,V414N,V414O,V414P,V414S,V414V,V417,V418,
+         V418A,V419,V426,V437,V438,V439,V440,V441,V442,V443,V444,V444A,V445,
+         V446,V447,V447A,V452A,V452B,V454,V465,V468,V469E,V469F,V469X,V477,
+         V478,V480,V481,V481A,V481B,V481C,V481D,V481X,V501,V502,V503,V504,
+         V505,V506,V535,V701,V702,V704,V704A,V705,V714,V714A,V715,V716,V717,
+         V719,V729,V730,V731,V732,V745A,V745B,BIDX,BORD,B0,B1,B2,B3,B4,B5,B6
+         ,B7,B9,B10,B11,B12,B13,B15,B16,B17,B18,B19,B20,M5,M18,M19,M19A,M34,
+         M39A,M39,M55,HIDX,H1,H1A,H2,H3,H4,H5,H6,H7,H8,H9,H0,H10,H33,H51,H52
+         ,H53,H54,H55,H56,H57,H58,H60,H61,H62,H63,H64,H65,H66,H80A,H80B,H80C
+         ,HIDXA,H11,H12Y,H12Z,H21,H22,H31,H31B,H31C,H32Z,H34,H38,H39,H42,H43,
+         HWIDX,HW1,HW2,HW3,HW4,HW5,HW6,HW7,HW8,HW9,HW10,HW11,HW12,HW13,HW15,
+         HW16,HW70,HW71,HW72,HW73,IDXML,SREGION2,S108,S108A,S109,IDX95,S504,
+         S507,S526,S527,S528)
+# now 252 variables
+
+# create a data set with variables that will be needed for analyses
+dhs_small <- dhs_small %>% 
+  select(CASEID, MIDX, V133, V135, V149, V190, V411, V414G, V414H, V414M, V414N, V414P, V414V, V714, V716, V717, V719, B4, B19, M5, H11, H22, H31, HW13, HW70)
+# 25 variables
+```
+
+### Rename variables that will be used in small data set
+```{r}
+dhs_small <- dhs_small %>% 
+  rename(c("id" = CASEID, "birthIndex" = MIDX, "maternalEd" = V133, "usualResident" = V135,  "maternalEdCat" = V149,  "widxCombo" = V190, "milk" = V411, "eggs" = V414G, "meat" = V414H, "organMeat" = V414M, "fish" = V414N, "cheese" = V414P, "yogurt" = V414V, "working" = V714, "occupation" = V716, "occupationCat" = V717, "employerCat" = V719, "sex" = B4, "ageChild" = B19, "breastfeedMos" = M5, "diarrhea" = H11, "fever" = H22, "cough" = H31,  "measureResult" = HW13, "haz" = HW70))
+```
+
+### Apply selection and exclusion criteria
+- In the current study, the exposure of interest is extended breastfeeding and the outcome of interest is stunting as defined by height-for-age z score. Extended breastfeeding is defined as breastfeeding between the ages of 12 months and 24 months, so only children in that age range will be included.
+- Not all households were selected for measurements and other participants were not measured for other reasons (e.g. some children are dead). Any child missing a height-for-age z score or with a flagged value will be removed from the data set.
+- Only the de jure population (people who usually live in the households surveyed) will be used for this study.
+- Inclusion criteria for the study:
+  - Child is 12 months of age or older
+  - Child is 23.9 months of age or younger
+  - Child has a non-flagged height-for-age Z score
+  - Part of the de jure population
+```{r}
+# only keep children between the ages of 12 and 23 months
+dhs_working <- dhs_small %>% 
+  filter(ageChild >=12 & ageChild <24) # now 2458 observations, removed 10,041
+
+# check HAZ variable
+class(dhs_working$haz) # factor
+table(dhs_working$haz, useNA = "always")
+# 6 flagged cases, 1270 NA
+
+# look at why so many NA for HAZ
+table(dhs_working$measureResult)
+# 1143 were not selected for measurement, 113 are dead, and only 12 were not present or missing for some other reason
+
+# change HAZ to a numeric variable
+dhs_working$haz <- as.character(dhs_working$haz)
+dhs_working$haz <- as.numeric(dhs_working$haz)
+summary(dhs_working$haz) # now 1276 NAs, flagged cases made NA by coercion
+
+# make HAZ a binary stunting variable
+dhs_working <- dhs_working %>% 
+  mutate(stunting = case_when(haz < -200 ~ 1,
+                              haz >= -200 ~ 0))
+# recode as factor
+class(dhs_working$stunting) # numeric
+dhs_working$stunting <- factor(dhs_working$stunting, levels = c(0,1), labels = c("Not stunted", "Stunted"))
+class(dhs_working$stunting) # factor
+
+# drop those missing a value for stunting
+dhs_working <- dhs_working %>% 
+  drop_na(stunting) # now 1182 observations, dropped 1276
+
+# only use de jure residents/usual residents
+class(dhs_working$usualResident)
+# factor, change to character
+dhs_working$usualResident <- as.character(dhs_working$usualResident)
+table(dhs_working$usualResident)
+# turn visitor to NA and drop NA
+dhs_working <- dhs_working %>% 
+  mutate(usualResident = case_when(usualResident %in% "Usual resident" ~ 1,
+                                   usualResident %in% "Visitor" ~ NA_real_))
+table(dhs_working$usualResident, useNA = "always")
+dhs_working <- dhs_working %>% 
+  drop_na(usualResident) # drop 13 observations, now 1,169 observations
+```
+
+### Create variables needed for analyses in working data set
+```{r}
+# look at sex variable
+class(dhs_working$sex) # factor
+table(dhs_working$sex)
+
+# recode the levels for sex and make a factor once again
+dhs_working <- dhs_working %>% 
+  mutate(sexChild = case_when(sex %in% "Male" ~ 1,
+                              sex %in% "Female" ~ 0))
+dhs_working$sexChild <- factor(dhs_working$sexChild, levels = c(0,1), labels = c("Female", "Male"))
+table(dhs_working$sexChild, dhs_working$sex) # looks good
+
+# check duration of breastfeeding variable
+class(dhs_working$breastfeedMos) # factor
+table(dhs_working$breastfeedMos) # 279 not breastfeeding
+
+# make a binary variable for extended breastfeeding
+dhs_working <- dhs_working %>% 
+  mutate(breastfeed = if_else(breastfeedMos %in% "Never breastfed", 0,
+                              if_else(breastfeedMos %in% "Ever breastfed, not currently breastfeeding", 0, 
+                                      if_else(breastfeedMos %in% c(12:23), 1, NULL))))
+# recode as factor
+dhs_working$breastfeed <- factor(dhs_working$breastfeed, levels = c(0,1), labels = c("No", "Yes"))
+table(dhs_working$breastfeed, dhs_working$breastfeedMos, useNA = "always")
+# recode looks good, no NAs
+
+# create a binary variable for any animal source food consumption
+# look at variable levels of a couple ASF variables
+table(dhs_working$milk, useNA = "always") # Yes, No, and Don't Know levels
+table(dhs_working$eggs, useNA = "always") # Yes, No, and Don't Know levels
+
+# create new variable for any ASF
+dhs_working <- dhs_working %>% 
+  mutate(asf = case_when(milk %in% "No" & eggs %in% "No" & meat %in% "No"
+                         & organMeat %in% "No" & fish %in% "No" & 
+                           cheese %in% "No" & yogurt %in% "No" ~ 0,
+                         milk %in% "Yes" | eggs %in% "Yes" | meat %in% "Yes"
+                         | organMeat %in% "Yes" | fish %in% "Yes" | 
+                           cheese %in% "Yes" |yogurt %in% "Yes" ~ 1)) 
+# if "Don't Know" is a response on all ASF variables, then it's missing
+# recode as factor
+dhs_working$asf <- factor(dhs_working$asf, levels = c(0,1), labels = c("No", "Yes"))
+table(dhs_working$asf, useNA = "always") # only one NA
+# drop one missing response for complete case analysis
+dhs_working <- dhs_working %>% 
+  drop_na(asf) # now 1168 observations
+
+# look at the wealth index variable
+class(dhs_working$widxCombo) # factor, no need to recode
+table(dhs_working$widxCombo, useNA = "always") # no NA
+
+# look at maternal occupation variables
+class(dhs_working$working) # factor
+table(dhs_working$working, useNA = "always") # 183 no, 985 yes, no NA
+class(dhs_working$occupation) # factor
+table(dhs_working$occupation, useNA = "always") # many categories, a lot with 0, no NA
+class(dhs_working$occupationCat) # factor
+table(dhs_working$occupationCat, useNA = "always") # broader categories of occupation, no NA
+table(dhs_working$employerCat, useNA = "always") # type of employer, 151 NA
+
+# create a new maternal occupation variable with three broader categories: not working, subsistence work, wage work
+dhs_working <- dhs_working %>% 
+  mutate(maternalJob = case_when(occupationCat %in% "Not working" ~0,
+                   occupationCat %in% "Agricultural - self employed" ~1,
+                   occupationCat %in% "Professional/technical/managerial" ~2,
+                   occupationCat %in% "Clerical" ~2,
+                   occupationCat %in% "Sales" ~2,
+                   occupationCat %in% "Agricultural - employee" ~2,
+                   occupationCat %in% "Household and domestic" ~2,
+                   occupationCat %in% "Services" ~2,
+                   occupationCat %in% "Skilled manual" ~2,
+                   occupationCat %in% "Unskilled manual" ~2,
+                   occupationCat %in% "Armed/security forces" ~2,
+                   occupationCat %in% "Other" ~ NA_real_,
+                   occupationCat %in% "Don't Know" ~ NA_real_))
+dhs_working$maternalJob <- factor(dhs_working$maternalJob, levels = c(0,1,2), labels = c("Not working", "Subsistence work", "Wage work"))
+table(dhs_working$maternalJob, useNA = "always") # 10 NAs from "Other" category
+
+# check class of maternal education variable
+class(dhs_working$maternalEd) #factor
+
+# recode years of maternal education as numeric
+dhs_working$maternalEd <- as.character(dhs_working$maternalEd)
+dhs_working$maternalEd <- as.numeric(dhs_working$maternalEd)
+class(dhs_working$maternalEd)
+table(dhs_working$maternalEd) # no NA
+
+# look at the three different infection variables - diarrhea, cough, and fever
+table(dhs_working$diarrhea) # 4 levels, only 2 used (No and Yes, last 2 weeks)
+table(dhs_working$cough) # 4 levels, only 2 used
+table(dhs_working$fever) # 2 levels, No and Yes (in codebook this is last 2 weeks)
+
+# recode each disease variable to only the two categories with responses
+dhs_working <- dhs_working %>% 
+  mutate(diarrheaNew = case_when(diarrhea %in% "No" ~ 0,
+                                 diarrhea %in% "Yes, last two weeks" ~ 1),
+         coughNew = case_when(cough %in% "No" ~ 0,
+                              cough %in% "Yes, last two weeks" ~ 1),
+         feverNew = case_when(fever %in% "No" ~ 0,
+                              fever %in% "Yes" ~ 1))
+# recode as factor
+dhs_working$diarrheaNew <- factor(dhs_working$diarrheaNew, levels = c(0,1), labels = c("No", "Yes"))
+dhs_working$coughNew <- factor(dhs_working$coughNew, levels = c(0,1), labels = c("No", "Yes"))
+dhs_working$feverNew <- factor(dhs_working$feverNew, levels = c(0,1), labels = c("No", "Yes"))
+# check recode
+table(dhs_working$diarrheaNew, dhs_working$diarrhea) 
+table(dhs_working$coughNew, dhs_working$cough)
+table(dhs_working$feverNew, dhs_working$fever) # all good recode, no NA
+
+```
+
+### Create a data set with only variables that will be used in modeling analysis
+```{r}
+# Create new dataset with only variables to be used in models
+dhs_model <- dhs_working %>% 
+  select(stunting, breastfeed, widxCombo, ageChild, maternalEd, asf)
+
+# Check to make sure there are no missing values
+summary(dhs_model) # no NA
+
+```
+
+- The final analytic data set contains 1168 observations. 
+- While a lot of the original data was removed, most of it was due to age exclusion criteria and due to missing measurement data. Most of the missing measurement data (90%) was missing because only a subset of households surveyed by the DHS were randomly selected for the anthropometry section. Other data was missing due to a deceased child, an absent child, or a few other unknown reasons. Therefore, this data should be missing completely at random, making a complete case analysis justifiable.
+- The amount of data removed for other reasons (flagged HAZ cases, visitors/de facto residents, missing on one of the analytic variables) totals to 20 observations. This is only 1.7% of the data.
+- A complete case analysis will be conducted.
+
+# Create a Figure 1
+```{r}
+
+grViz("digraph flowchart {
+
+      # node definitions with substituted label text
+      node [fontname = Helvetica, shape = rectangle, fontsize=10] 
+      # 6 nodes in the diagram
+      tab1 [label = '@@1'] # starting
+      tab2 [label = '@@2'] # exclusion 1
+      tab3 [label = '@@3'] # exclusion 2
+      tab4 [label = '@@4'] # exclusion 3
+      tab5 [label = '@@5'] # exclusion 4
+      tab6 [label = '@@6'] # exclusion 5
+      
+      # flow of nodes
+      tab1 -> tab2 -> tab3 -> tab4 -> tab5 -> tab6
+}
+      # text in each rectangle box
+      [1]: 'Records of all children under the age of 5 in the Madagascar 2021 DHS Data \\n n=12,499'
+      [2]: 'Excluding 10,041 individuals younger than 12 months or older than 23.9 months \\n n=2,458'
+      [3]: 'Excluding 1,270 individuals with missing values on height-for-age z score \\n n=1188'
+      [4]: 'Excluding 6 individuals with flagged values on height-for-age z score \\n n=1182'
+      [5]: 'Excluding 13 individuals who are visitors (non-de jure residents) \\n  n=1169'
+      [6]: 'Excluding 1 individual with missing data on other variables used in analysis \\n n=1168'
+      ")
+```
+
+# Create a Table 1
+## Create rough first table with table1 function
+```{r}
+
+table1(~ageChild + sexChild + diarrheaNew + coughNew + feverNew + asf + breastfeed + maternalEd + maternalJob  + widxCombo|stunting, dhs_working)
+
+```
+
+## Add variable labels to the table 1
+```{r}
+label(dhs_working$ageChild) <- "Age (months)"
+label(dhs_working$sexChild) <- "Sex"
+label(dhs_working$diarrheaNew) <- "Diarrhea"
+label(dhs_working$coughNew) <- "Cough"
+label(dhs_working$feverNew) <- "Fever"
+label(dhs_working$asf) <- "Any animal source foods"
+label(dhs_working$breastfeed) <- "Currently breastfeeding"
+label(dhs_working$maternalEd) <- "Education (years)"
+label(dhs_working$maternalJob) <- "Occupation"
+label(dhs_working$widxCombo) <- "Wealth index"
+
+# new table 1 with variable labels
+table1 <- table1(~ageChild + sexChild + diarrheaNew + coughNew + feverNew + asf + breastfeed + maternalEd + maternalJob  + widxCombo|stunting, dhs_working)
+table1
+
+```
+
+## Export table 1 to Excel
+```{r}
+#table1 <- as.data.frame(table1)
+#write_xlsx(table1, path = "C:/Users/sydne/OneDrive/Documents/MPH Stuff/2022 - Fall/Advanced Data Analysis/finalProjectT1.xlsx", col_names = TRUE, format_headers = TRUE)
+
+```
+
+# Analysis
+- To determine the relationship between continued breastfeeding and stunting in children aged 12-24 months in Madagascar, logistic regression will be used.
+- An unadjusted model will be created, as well as a model adjusted for a minimum sufficient set of covariates as determined by a DAG.
+- Finally, a third model with an interaction term will be created to determine if the intake of any animal source foods modifies the association between continued breastfeeding and stunting.
+- A likelihood ratio test will be used to compare the two models to determine if the interaction term significantly improves the model.
+- Assumptions and model fit will be assessed.
+
+## Unadjusted model
+```{r}
+# Create unadjusted logistic regression model
+model1 <- glm(stunting ~ breastfeed, data = dhs_model, family = "binomial")
+summary(model1) # continued breastfeeding is significant
+
+odds.n.ends(model1)
+# breastfeed yes OR = 0.74 (95% CI 0.56-0.96)
+
+```
+
+## Check to see if there are enough cases in each exposure/outcome category with the variables that may be adjusted for in the final model
+```{r}
+
+# check to see if sample size is large enough in all categories
+table(dhs_model$stunting, dhs_model$breastfeed, dhs_model$widxCombo)
+# all categories have at least 10, smallest is 14
+
+```
+
+## Check linearity assumptions for the continuous covariates
+```{r}
+# Box-Tidwell test for linearity - child age in months
+dhs_model <- dhs_model %>%
+  mutate(ageTimesLogAge = ageChild * log(ageChild)) # create term to test linearity
+
+modelLogAge <- glm(stunting ~ ageChild + ageTimesLogAge, data = dhs_model, family = "binomial") # create a model to test linearity
+summary(modelLogAge) # age*log(age) is not significant, so meets assumption
+
+# Box-Tidwell test for linearity - maternal education
+dhs_model <- dhs_model %>% 
+  mutate(edTimesLogEd = maternalEd*log(maternalEd)) # create term to test linearity
+
+modelLogEd <- glm(stunting ~ maternalEd + edTimesLogEd, data = dhs_model, family = "binomial") # create a model to test linearity
+summary(modelLogEd) # ed*log(ed) not significant, meets assumption of linearity
+
+```
+
+
+## Adjusted model and effect modification 
+```{r}
+# Model adjusted for minimum sufficient covariates determined by DAG
+model2 <- glm(stunting ~ breastfeed + ageChild + maternalEd + widxCombo,
+               data = dhs_model, family = "binomial")
+summary(model2) # breastfeeding no longer significant, age is significant and richest wealth quintile is significant
+
+odds.n.ends(model2) # breastfeed yes OR = 0.98 (95 CI 0.73-1.32)
+
+# compare coefficients for breastfeeding
+compareCoefs(model1, model2) # coefficient for breastfeed is very different
+
+# Create model with interaction term between breastfeed and animal source foods to test for effect modification
+modelInt <- glm(stunting ~ ageChild + maternalEd + widxCombo + breastfeed*asf, data = dhs_model, family = "binomial")
+summary(modelInt)
+
+# Use LR test to see if there is significant EM
+lrtest(modelInt, model2)
+# term does not significantly improve model, no effect modification on the relationship between breastfeeding and stunting by animal source food intake
+
+```
+Results
+- After adjusting for covariates, there is no significant association between continued breastfeeding and stunting (OR = 0.98, 95% CI 0.73-1.32).
+- Intake of any animal source foods does not modify the relationship between continued breastfeeding and stunting (p = 0.48).
+
+## Assess assumptions and model fit
+```{r}
+# assess multicollinearity
+summ(model2, vifs = TRUE) # all are approximately one
+
+# assess any influential points
+# plot Cook's distances
+plot(model2, which = 4, id.n = 3, col = "red")
+
+# get Cook's distances, some other stats, and create data set
+model2_data<- augment(model2) %>%  
+  mutate(index = 1:n())
+head(model2_data)
+
+# identify and exclude observations greater than the Cook's distance cutoff of 4/n
+cutoff <- (4/1168) # define cutoff
+dhs_out <- model2_data %>% # excludes observations
+  filter(.cooksd<cutoff) # now 1163 observations, 5 removed
+
+# check percent kept
+nrow(dhs_out)/nrow(dhs_model) # 99.57% kept
+
+# create new model with the influential observations excluded
+model3 <- glm(stunting ~ breastfeed + ageChild + maternalEd + widxCombo,
+               data = dhs_out, family = "binomial")
+summary(model3) # seems pretty similar to original model at first glance, no crazy values for coefficients/p-values or changes in overall significance
+
+# compare coefficients between original model and the model with exclusions
+compareCoefs(model2, model3)
+# no drastic changes, some coefficients have changed a bit and some SE have changed a bit, but very similar
+
+```
+- Given that only five observations would be removed for being potentially influential and removing them does not appear to change the coefficients very much, as well as the fact that there are no values outside the realm of possibility, the observations will be left in and the full analytic data set will be used for modeling. There does not seem to be any overwhelming evidence for removing the data points, so it is preferable to include all data.
+
+## Assess model fit for final model (model2)
+```{r}
+# assess various model fit statistics
+blr_model_fit_stats(model2) # pretty low pseudo R2
+
+# assess goodness of fit
+blr_test_hosmer_lemeshow(model2) # not significant, model fit is fine
+```
+- Pseudo R2 are all pretty low, indicating the full model might not be much of an improvement over the null model in terms of log-likelihood.
+- Hosmer-Lemeshow goodness of fit test is not significant (p = 0.58), so there is not a concern with the model fit.
